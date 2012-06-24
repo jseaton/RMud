@@ -37,7 +37,6 @@ class Thing
 
   define_shortcut(:link) do
     define_instance_method :go! do |user|
-      puts "go " + names(user)[0].to_s
       user.room.things.delete user
       user.room = @room
       @room.things << user
@@ -45,9 +44,6 @@ class Thing
     end
     define_instance_method :visible? do |user|
       ct = user.room.container(user, self)
-      p ct
-      p self
-      p user.room
       (not user.room == @room) or (ct == user.room or ct == user)
     end
   end
@@ -55,7 +51,12 @@ class Thing
   define_shortcut(:takeable) do
     define_instance_method :take! do |user|
       user.things << self
-      [user.room.delete(user,self)].flatten.compact.any? ? "You put the " + names(user)[0].to_s + " in your pocket" : "You cannot take the " + names(user)[0].to_s
+      if [user.room.delete(user,self)].flatten.compact.any?
+        user.room.collate :say!, user, "Takes the " + names(user)[0].to_s
+        "You put the " + names(user)[0].to_s + " in your pocket"
+      else
+        "You cannot take the " + names(user)[0].to_s
+      end
     end
   end
 
@@ -103,11 +104,13 @@ class Thing
     @names
   end
 
-  def description! user 
-    @description #+ "\n" + self.inspect
+  def look! user 
+    @description
   end
   
-  alias :look! :description!
+  def description! user
+    @description if visible? user
+  end
 
   def method_missing verb, user, *args
     "You cannot " + verb.to_s.chomp("!") + " the " + names(user)[0].to_s

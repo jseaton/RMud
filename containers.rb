@@ -6,10 +6,10 @@ class Container < Thing
     @things = things
   end
   
-  def collate message, user, vis, *args
+  def collate message, user, *args
     @things.map do |thing|
       begin
-        thing.send message, user, *args if vis or thing.visible? user
+        thing.send message, user, *args
       rescue
         nil
       end
@@ -19,14 +19,18 @@ class Container < Thing
   end
 
   def container user, thing
-    @things.member?(thing) ? self : collate(:container, user, true, thing).select do |thing|
-      thing.is_a? Thing
-    end[0]
+    if @things.member?(thing)
+      self
+    else 
+      collate(:container, user, thing).select do |thing|
+        thing.is_a? Thing
+      end[0]
+    end
   end
 
   define_shortcut(:reply_collate) do |name,message|
     define_instance_method name do |user,*args|
-      collate message, user, false, *args
+      collate message, user, *args
     end
   end
 
@@ -46,19 +50,26 @@ class Container < Thing
 
   def get user, name
     @things.select do |th|
-      th and th.names(user).member? name
+      th.names(user).member? name
     end[0]
   end
 
   def forward_method message, user, name, *args
-    p [message, name, user, args]
+    #p [self, message, name, user, args]
     thing = get user, name
     return thing.send(message, user, *args) if thing
-    collate message, user, true, name, *args
+    @things.map do |thing|
+      begin
+        reply = thing.forward message, user, name, *args if thing.respond_to? :forward
+        return reply if reply
+      rescue
+        nil
+      end
+    end
+    nil
   end
 
   def method_missing message, *args
-    p [self, message, args]
     return "You cannot " + message.to_s[0..-2] if args.length == 1
     forward message, *args
   end
@@ -85,8 +96,7 @@ class Room < BasicLook
          [:north, :south, :east, :west].member? name
        end
      end.flatten
-    [cb.call(user,*args), 
-     vis.any? ? "There are exits to the " + vis.join(", ") : nil]
+    cb.call(user,*args) + (vis.any? ? ["There are exits to the " + vis.join(", ")] : [])
   end
 end
 
