@@ -1,7 +1,12 @@
 class Thing
+  attr_accessor :shortcuts
+
   def self.define_shortcut shortcut_name, &block
-    self.send :define_method, shortcut_name, block
-    define_singleton_method shortcut_name, block
+    self.send :define_method, shortcut_name do |*args|
+      @shortcuts[shortcut_name] = args
+      self.instance_exec(*args, &block)
+    end
+    define_singleton_method shortcut_name, &block 
   end
 
   def self.define_instance_method name, &block
@@ -58,6 +63,21 @@ class Thing
         "You cannot take the " + names(user)[0].to_s
       end
     end
+    define_instance_method :put! do |user|
+      if user.things.delete self
+        user.room.things << self
+        user.room.collate :say!, user, "Puts down the " + names(user)[0].to_s
+        "You put the " + names(user)[0].to_s + " down"
+      else
+        "You don't have the " + names(user)[0].to_s
+      end
+    end
+  end
+
+  define_shortcut(:reply_var) do |name|
+    define_instance_method name do |user|
+      instance_variable_get ("@"+name.to_s).to_sym
+    end
   end
 
   def self.wrap name, &wrapper
@@ -98,6 +118,13 @@ class Thing
     @names       = names.class == Array ? names : [names]
     @description = description
     @reply_list  = {}
+    @shortcuts   = {}
+  end
+
+  def rebuild user=nil
+    @shortcuts.each do |name,args|
+      send name, *args
+    end
   end
 
   def names user

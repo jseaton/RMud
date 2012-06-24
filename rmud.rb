@@ -1,8 +1,10 @@
-require './world'
+require './lib'
 require 'gserver'
 require 'thread'
+require 'yaml'
 
 def format strs, prefix=-1
+  #p strs
   return (" "*prefix)+strs if strs.class == String
   strs.map do |str|
     format str, prefix + 1 if str
@@ -20,35 +22,45 @@ class Server < GServer
   end
 
   def serve raw
-    message=raw.chomp.split(' ').map {|e| e.to_sym }
-    args = [(message[0].to_s+"!").to_sym, @user] + message[1..-1]
-    begin
-      reply = @user.room.send(*args)
-    rescue => m
-      return m
-    end
-    reply != [] ? format_well(reply) : "Could not find " + args[2].to_s
+
   end
 end
 
 class TelnetServer < GServer
-  def initialize(port, world, *args)
+  def initialize(port, world, users, *args)
     super(port, *args)
     @world = world
+    @users = users
+    @users.each do |user|
+      user.room.things.delete user
+    end
+    Thread.new do
+      loop do
+        output = open ARGV[0], "w"
+        output.write YAML.dump([@world,@users])
+        output.flush
+        sleep 10
+      end
+    end
   end
   def serve(io)
     begin
       io.print "Please enter your name: "
       name = io.gets.chomp
-      user = User.new name.to_sym, "A human called " + name, @world
-      server = Server.new user
-      io.puts server.serve "look"
+      users = @users.select {|u| u.names(nil).member? name.to_sym }
+      user = users[0]
+      if user
+        user.room.things << user
+      else
+        user = User.new(name.to_sym, "A human called " + name, @world)
+        @users << user
+      end
+        
+      process user, io, "look"
       Thread.new do
         loop do
-          puts "in"
           io.puts user.queue.pop
           io.print "> "
-          puts "out"
         end
       end
       loop do
@@ -56,8 +68,12 @@ class TelnetServer < GServer
         message = io.gets.chomp
         break if message == "quit"
         next if message == ""
-        begin 
-          io.puts server.serve(message)
+        begin
+          if name == "admin"
+            admin_process user, io, message
+          else
+            process user, io, message
+          end
         rescue => m
           log "ERROR: " + name + " : " + m.to_s
           puts m.backtrace
@@ -74,10 +90,31 @@ class TelnetServer < GServer
       io.close
     end
   end
+
+  def process user, io, message
+    splat=message.chomp.split(' ').map {|e| e.to_sym }
+    args = [(splat[0].to_s+"!").to_sym, user] + splat[1..-1]
+    reply = user.room.send(*args)
+    if reply.is_a? Disambiguation
+      reply.each_with_index do |thing,i|
+        io.puts i.to_s + ": " + format_well(thing.look!(user))
+      end
+      io.print ">> "
+      reply = reply[io.gets.chomp.to_i].send(args[0],user,*args[3..-1])
+    end
+    io.puts((reply != [] and reply != nil) ? format_well(reply) : "Could not find " + args[2].to_s)
+  end
+
+  def admin_process user, io, message
+    io.puts eval(message).inspect
+  end
 end
 
+world, users = YAML.load(open(ARGV[0]).read)
+world.rebuild
 
-tserver = TelnetServer.new 2222, world
+tserver = TelnetServer.new 2222, world, users
 tserver.start
 tserver.audit = true
+
 tserver.join

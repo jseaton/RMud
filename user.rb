@@ -1,9 +1,21 @@
+require 'thread'
+
+class Queue
+  def to_yaml_properties
+    []
+  end
+end
+
 class User < BasicLook
   attr_accessor :room, :queue
   def initialize names, desc, room
     super names, desc
     @room = room
     @room.things << self
+    @queue = Queue.new
+  end
+
+  def rebuild user=nil
     @queue = Queue.new
   end
 
@@ -25,7 +37,6 @@ class User < BasicLook
   end
 
   wrap :look! do |user,args,cb|
-    #p @things
     if user == self
       contents = cb.call(user,*args)
       #p contents

@@ -1,3 +1,6 @@
+class Disambiguation < Array
+end
+
 class Container < Thing
   attr_accessor :things
   
@@ -28,6 +31,11 @@ class Container < Thing
     end
   end
 
+  def rebuild user=nil
+    super
+    collate :rebuild, user
+  end
+
   define_shortcut(:reply_collate) do |name,message|
     define_instance_method name do |user,*args|
       collate message, user, *args
@@ -42,41 +50,54 @@ class Container < Thing
     end
   end
 
-  def forward message, *args
-    user = args[0]
-    name = args[1]
-    forward_method message, user, name, *args[2..-1]
-  end
-
   def get user, name
     @things.select do |th|
       th.names(user).member? name
-    end[0]
-  end
-
-  def forward_method message, user, name, *args
-    #p [self, message, name, user, args]
-    thing = get user, name
-    return thing.send(message, user, *args) if thing
-    @things.map do |thing|
-      begin
-        reply = thing.forward message, user, name, *args if thing.respond_to? :forward
-        return reply if reply
-      rescue
-        nil
-      end
     end
-    nil
   end
 
-  def method_missing message, *args
-    return "You cannot " + message.to_s[0..-2] if args.length == 1
-    forward message, *args
+  def dis_forward message, user, name, *args
+    all = get_all(user, name)
+    
+    if all.length == 1
+      all[0].send message, user, *args[1..-1]
+    elsif all.length == 0
+      nil
+    else
+      Disambiguation.new all
+    end
+  end
+
+  def all_forward message, user, name, *args
+    get_all(user, name).map do |thing|
+      thing.send message, user, *args[2..-1]
+    end
+  end
+
+  def get_all user, name
+    #p [self, name, user]
+    ret = get user, name
+    @things.each do |thing|
+      begin
+        ret += thing.get_all user, name if thing.respond_to? :get_all
+      rescue
+      end
+    end.compact
+    ret
+  end
+
+  def method_missing message, user, *args
+    return "You cannot " + message.to_s[0..-2] + " the " + names(args[0])[0].to_s if args.length <= 1
+    dis_forward message, user, *args
   end
 
   def inspect
     "<#{self.class} #{@names[0].to_s} #{@things.map {|e| e.instance_variable_get(:@names)[0].to_s } }>"
   end
+
+  def inventory! user
+    user.look! user
+  end 
 end
 
 class BasicLook < Container
@@ -96,7 +117,12 @@ class Room < BasicLook
          [:north, :south, :east, :west].member? name
        end
      end.flatten
-    cb.call(user,*args) + (vis.any? ? ["There are exits to the " + vis.join(", ")] : [])
+    vis.any? ? [cb.call(user,*args), "There are exits to the " + vis.join(", ")] : cb.call(user,*args)
+  end
+
+  def method_missing message, *args
+    return "You cannot " + message.to_s[0..-2] if args.length <= 1
+    dis_forward message, *args
   end
 end
 
