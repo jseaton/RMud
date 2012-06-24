@@ -1,4 +1,4 @@
-require './lib'
+require './world'
 
 def format strs, prefix=-1
   return (" "*prefix)+strs if strs.class == String
@@ -20,27 +20,18 @@ class Server
   def serve raw
     message=raw.chomp.split(' ').map {|e| e.to_sym }
     args = [(message[0].to_s+"!").to_sym, @user] + message[1..-1]
-    reply = @user.room.send *args
-    reply ? format_well(reply) : "Could not find " + args[2].to_s
+    p args
+    begin
+      reply = [@user.room.send(*args)].flatten.compact
+    rescue => m
+      return m
+    end
+    reply != [] ? format_well(reply) : "Could not find " + args[2].to_s
   end
 end
 
-avatar = Avatar.new :person, "A person"
-room = Room.new :hell, "Hell"
-door = Door.new([:door,:self], "A door", room)
-room.things << door
-user = User.new avatar, room
-door.reply_random :what!, ["Hello", "How are you?"]
-door.reply_list :fish!, ["What", "???"]
-
-other = Room.new :other, "Another room"
-doorway = Doorway.new [:doorway,:west], "Doorway", other
-room.things << doorway
-other.things << Doorway.new([:doorway,:east], "Doorway", room)
-other.things << Thing.new(:spoon, "A spoon")
-
-
-server = Server.new user
+server = Server.new user(world)
+puts server.serve "look"
 print "> "
 while message=gets
   puts server.serve message
