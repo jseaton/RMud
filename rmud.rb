@@ -56,7 +56,7 @@ class TelnetServer < GServer
         @users << user
       end
         
-      process user, io, "look"
+      process user, io, "look" unless name == "admin"
       Thread.new do
         loop do
           io.puts user.queue.pop
@@ -94,6 +94,7 @@ class TelnetServer < GServer
   def process user, io, message
     splat=message.chomp.split(' ').map {|e| e.to_sym }
     args = [(splat[0].to_s+"!").to_sym, user] + splat[1..-1]
+
     reply = user.room.send(*args)
     if reply.is_a? Disambiguation
       reply.each_with_index do |thing,i|

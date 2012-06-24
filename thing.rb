@@ -1,6 +1,6 @@
-class Thing
-  attr_accessor :shortcuts
+require './sproc'
 
+class Thing
   def self.define_shortcut shortcut_name, &block
     self.send :define_method, shortcut_name do |*args|
       @shortcuts[shortcut_name] = args
@@ -40,19 +40,6 @@ class Thing
     end
   end
 
-  define_shortcut(:link) do
-    define_instance_method :go! do |user|
-      user.room.things.delete user
-      user.room = @room
-      @room.things << user
-      @room.look! user
-    end
-    define_instance_method :visible? do |user|
-      ct = user.room.container(user, self)
-      (not user.room == @room) or (ct == user.room or ct == user)
-    end
-  end
-
   define_shortcut(:takeable) do
     define_instance_method :take! do |user|
       user.things << self
@@ -87,7 +74,10 @@ class Thing
     end
   end
 
-  def wrap name, &wrapper
+  def wrap name, wrapper_s
+    wrapper = wrapper_s.respond_to?(:call) ? wrapper_s : SProc.new(wrapper_s)
+    @wrappings[name] ||= []
+    @wrappings[name] << wrapper
     wrapee = method name
     define_instance_method name do |*args|
       wrapper.call(user, args, proc do wrapee.call(user,*args) end)
@@ -105,13 +95,18 @@ class Thing
   end
 
   def wrap_pass name
-    wrap name do |user,args,cb|
-      if args.any?
-        method_missing name, user, *args
-      else
-        cb.call(name, user, *args)
-      end
-    end
+    wrap(name, proc do |user,args,cb|
+           if args.any?
+             method_missing name, user, *args
+           else
+             cb.call(name, user, *args)
+           end
+         end, false)
+  end
+
+  def define_method name, proc
+    @pmethods[name] = proc
+    define_instance_method name, &proc
   end
 
   def initialize names, description
@@ -119,11 +114,19 @@ class Thing
     @description = description
     @reply_list  = {}
     @shortcuts   = {}
+    @wrappings   = {}
+    @pmethods    = {}
   end
 
   def rebuild user=nil
     @shortcuts.each do |name,args|
       send name, *args
+    end
+    @pmethods.each do |name,proc|
+      define_instance_method name, &proc
+    end
+    @wrappings.each do |name,wrapper|
+      wrap name, wrapper
     end
   end
 

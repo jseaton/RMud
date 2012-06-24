@@ -57,6 +57,7 @@ class Container < Thing
   end
 
   def dis_forward message, user, name, *args
+    p [:forward, :message, user, name, args]
     all = get_all(user, name)
     
     if all.length == 1
@@ -87,7 +88,7 @@ class Container < Thing
   end
 
   def method_missing message, user, *args
-    return "You cannot " + message.to_s[0..-2] + " the " + names(args[0])[0].to_s if args.length <= 1
+    return "You cannot " + message.to_s[0..-2] + " the " + names(args[0])[0].to_s if args.length == 0
     dis_forward message, user, *args
   end
 
@@ -120,16 +121,16 @@ class Room < BasicLook
     vis.any? ? [cb.call(user,*args), "There are exits to the " + vis.join(", ")] : cb.call(user,*args)
   end
 
-  def method_missing message, *args
-    return "You cannot " + message.to_s[0..-2] if args.length <= 1
-    dis_forward message, *args
+  def method_missing message, user, *args
+    return "You cannot " + message.to_s[0..-2] if args.length == 0
+    dis_forward message, user, *args
   end
 end
 
 class Window < Thing
-  attr_accessor :room
+  reply_var :room
   wrap :look! do |user,args,cb|
-    [description!(user), room.look!(user)]
+    [description!(user), room(user).look!(user)]
   end
 
   def initialize names, description, room
