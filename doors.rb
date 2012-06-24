@@ -39,15 +39,17 @@ class Portal < Door
     @parent = parent
     @other = other
   end
+
   takeable
-  wrap(:take!) do |user,args,cb|
+
+  wrap :take! do |user,args,cb|
     @parent = user
-    cb.call(user,*args)
+    cb.call(user)
   end
 
-  wrap(:put!) do |user,args,cb|
+  wrap :put! do |user,args,cb|
     @parent = user.room
-    cb.call(user,*args)
+    cb.call(user)
   end
     
   def room user
@@ -64,8 +66,8 @@ class LockedDoor < Door
     @secret = secret
   end
 
-  wrap :go! do |user,args,cb|
-    @locked ? "The " + names(user)[0].to_s + " is locked" : cb.call(user,*args)
+  def go! user
+    @locked ? "The " + names(user)[0].to_s + " is locked" : super(user)
   end
 
   def unlock! user, *args
@@ -89,8 +91,8 @@ class LockedDoor < Door
     end
   end
 
-  wrap :open! do |user,args,cb|
-    @locked ? "You cannot open the door" : cb.call(*args)
+  def open! user
+    @locked ? "You cannot open the door" : super(user)
   end
 end
 

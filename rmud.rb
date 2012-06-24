@@ -33,6 +33,7 @@ class TelnetServer < GServer
     @users = users
     @users.each do |user|
       user.room.things.delete user
+      user.rebuild
     end
     Thread.new do
       loop do
@@ -51,6 +52,7 @@ class TelnetServer < GServer
       user = users[0]
       if user
         user.room.things << user
+        user.rebuild
       else
         user = User.new(name.to_sym, "A human called " + name, @world)
         @users << user

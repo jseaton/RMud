@@ -8,6 +8,7 @@ class SProc < DelegateClass(Proc)
   attr_reader :proc_src
   
   def initialize(proc_src)
+    p proc_src
     super(eval("Proc.new { #{proc_src} }"))
     @proc_src = proc_src
   end

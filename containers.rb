@@ -32,10 +32,10 @@ class Container < Thing
   end
 
   def rebuild user=nil
-    super
+    super user
     collate :rebuild, user
   end
-
+  
   define_shortcut(:reply_collate) do |name,message|
     define_instance_method name do |user,*args|
       collate message, user, *args
@@ -57,9 +57,9 @@ class Container < Thing
   end
 
   def dis_forward message, user, name, *args
-    p [:forward, :message, user, name, args]
+    p [:forward, message, user, name, args]
     all = get_all(user, name)
-    
+    p all
     if all.length == 1
       all[0].send message, user, *args[1..-1]
     elsif all.length == 0
@@ -104,13 +104,13 @@ end
 class BasicLook < Container
   reply_collate :look!, :description!
   wrap :look! do |user,args,cb|
-    [description!(user), cb.call(user,*args)]
+    [description!(user), cb.call]
   end
   wrap_pass :look!
 end
 
 class Room < BasicLook
-  wrap :look! do |user,args,cb|
+  def look! user, *args
     vis = args.any? ? [] : @things.select do |thing| 
        thing.respond_to?(:go!) and thing.visible?(user)
      end.map do |thing| 
@@ -118,7 +118,7 @@ class Room < BasicLook
          [:north, :south, :east, :west].member? name
        end
      end.flatten
-    vis.any? ? [cb.call(user,*args), "There are exits to the " + vis.join(", ")] : cb.call(user,*args)
+    vis.any? ? [super(user,*args), "There are exits to the " + vis.join(", ")] : super(user,*args)
   end
 
   def method_missing message, user, *args
@@ -129,7 +129,7 @@ end
 
 class Window < Thing
   reply_var :room
-  wrap :look! do |user,args,cb|
+  def look! user
     [description!(user), room(user).look!(user)]
   end
 

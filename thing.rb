@@ -1,9 +1,13 @@
 require './sproc'
 
 class Thing
+  attr_accessor :shortcuts, :wrappings, :pmethods
   def self.define_shortcut shortcut_name, &block
     self.send :define_method, shortcut_name do |*args|
-      @shortcuts[shortcut_name] = args
+      self.instance_eval do
+        @pmethods << [shortcut_name, :shortcut, args] if not @pmethods.select {|e| e[0] == shortcut_name }.any?
+      end
+      #@shortcuts[shortcut_name] = args
       self.instance_exec(*args, &block)
     end
     define_singleton_method shortcut_name, &block 
@@ -74,10 +78,14 @@ class Thing
     end
   end
 
-  def wrap name, wrapper_s
+  def wrap name, wrapper_s, record=true
+    p wrapper_s
     wrapper = wrapper_s.respond_to?(:call) ? wrapper_s : SProc.new(wrapper_s)
-    @wrappings[name] ||= []
-    @wrappings[name] << wrapper
+    if record
+      @pmethods << [name, :wrapping, wrapper]
+      #@wrappings[name] ||= []
+      #@wrappings[name] << wrapper
+    end
     wrapee = method name
     define_instance_method name do |*args|
       wrapper.call(user, args, proc do wrapee.call(user,*args) end)
@@ -89,44 +97,62 @@ class Thing
       if args.any?
         method_missing name, user, *args
       else
-        cb.call name, user, *args
+        cb.call
       end
     end
   end
 
   def wrap_pass name
-    wrap(name, proc do |user,args,cb|
+    wrap(name, %q{ |user,args,cb|
            if args.any?
              method_missing name, user, *args
            else
-             cb.call(name, user, *args)
+             cb.call
            end
-         end, false)
+         })
   end
 
   def define_method name, proc
-    @pmethods[name] = proc
-    define_instance_method name, &proc
+    aproc = proc.respond_to?(:call) ? proc : SProc.new(proc)
+    #@pmethods[name] = aproc
+    @pmethods << [name, :method, aproc]
+    define_instance_method name, &aproc
   end
 
   def initialize names, description
     @names       = names.class == Array ? names : [names]
     @description = description
     @reply_list  = {}
-    @shortcuts   = {}
-    @wrappings   = {}
-    @pmethods    = {}
+    #@shortcuts   = {}
+    #@wrappings   = {}
+    #@pmethods    = {}
+    @pmethods     = []
   end
 
   def rebuild user=nil
+    require 'pp'
+    @pmethods.each do |name,type,args|
+      pp [self,name,type,args,@pmethods]
+      case type
+      when :shortcut
+        send name, *args
+      when :method
+        define_instance_method name, &args
+      when :wrapping
+        wrap name, args, false
+      end
+    end
+    return true
     @shortcuts.each do |name,args|
       send name, *args
     end
     @pmethods.each do |name,proc|
       define_instance_method name, &proc
     end
-    @wrappings.each do |name,wrapper|
-      wrap name, wrapper
+    @wrappings.each do |name,wrappers|
+      wrappers.each do |wrapper|
+        wrap name, wrapper, false
+      end
     end
   end
 

@@ -16,6 +16,7 @@ class User < BasicLook
   end
 
   def rebuild user=nil
+    super user
     @queue = Queue.new
   end
 
@@ -24,26 +25,25 @@ class User < BasicLook
     nil
   end
 
-  wrap :names do |user,args,cb|
-    user == self ? [:pocket,:pockets] : cb.call(user)
+  def names user
+    user == self ? [:pocket,:pockets] : super(user)
   end
 
   def visible? user
     user != self
   end
 
-  wrap :description! do |user,args,cb|
-    user == self ? nil : cb.call(user,*args)
+  def description! user
+    user == self ? nil : super(user)
   end
 
-  wrap :look! do |user,args,cb|
-    if user == self
-      contents = cb.call(user,*args)
-      #p contents
+  def look! user,*args
+    if user == self or user.room == self
+      contents = super(user,*args)
       if args.any?
         contents
       else
-        ["In your pockets you have", contents[1].flatten.compact.any? ? contents[1] : ["Nothing"]]
+        [user.room == self ? "It's quite dark in here" : "In your pockets you have", contents[1].flatten.compact.any? ? contents[1] : ["Nothing"]]
       end
     elsif args == []
       description!(user)
@@ -51,6 +51,19 @@ class User < BasicLook
       nil
     end
   end
+
+  #def takeable
+  #  super
+  #  wrap(:take!, %q{ |user,args,cb|
+  #    @room = user
+  #    cb.call #user#, *args
+  #  })
+  #  wrap(:put!, %q{ |user,args,cb|
+  #    @room = user
+  #    cb.call #user#, *args
+  #  })
+  #end
+
 
   def inspect
     "<#{self.class} #{@names[0].to_s} in #{@room.instance_variable_get(:@names)[0].to_s} : #{@things.map {|e| e.instance_variable_get(:@names)[0].to_s } }>"

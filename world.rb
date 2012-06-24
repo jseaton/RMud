@@ -11,6 +11,7 @@ room.things << door
 fish = User.new(:fish, "A fish", room)
 ham = User.new(:ham, "A ham", room)
 ham.takeable
+fish.takeable
 door.reply_random :what!, ["Hello", "How are you?"]
 door.reply_list :fish!, ["What", "???"]
   
@@ -27,5 +28,9 @@ portal.other = portal2
 
 room.things << portal
 room.things << portal2
+
+doorway.define_method(:jam!, %q{ |user|
+  "WAAAAAA"
+})
 
 open(ARGV[0],"w").write YAML.dump([room,[fish,ham]])
