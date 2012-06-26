@@ -1,22 +1,22 @@
 class Thing
   define_shortcut(:link) do
     define_instance_method :go! do |user|
-      user.room.things.delete user
-      user.room = room(user)
+      user.parent.things.delete user
+      user.parent = room(user)
       room(user).things << user
       room(user).look! user
     end
     define_instance_method :visible? do |user|
-      ct = user.room.container(user, self)
-      (not user.room == room(user)) or (ct == user.room or ct == user)
+      ct = user.parent.container(user, self)
+      (not user.parent == room(user)) or (ct == user.parent or ct == user)
     end
   end
 end
 
 class Door < Thing
   attr_accessor :room
-  def initialize names, description, room
-    super names, description
+  def initialize names, description, parent, room
+    super names, description, parent
     @room = room
   end
   reply_var :room
@@ -33,35 +33,23 @@ class Doorway < Window
 end
 
 class Portal < Door
-  attr_accessor :parent, :other
+  attr_accessor :other
   def initialize names, description, parent, other
-    super names, description, nil
-    @parent = parent
+    super names, description, parent, nil
     @other = other
   end
 
   takeable
-
-  wrap :take! do |user,args,cb|
-    @parent = user
-    cb.call(user)
-  end
-
-  wrap :put! do |user,args,cb|
-    @parent = user.room
-    cb.call(user)
-  end
     
   def room user
-    #p @other.parent
     @other.parent
   end
 end
     
 
 class LockedDoor < Door
-  def initialize names, description, room, secret
-    super names, description, room
+  def initialize names, description, parent, room, secret
+    super names, description, parent, room
     @locked = true
     @secret = secret
   end
@@ -71,9 +59,11 @@ class LockedDoor < Door
   end
 
   def unlock! user, *args
-    p args
     return "You unlock a door with a key" if args.length != 1
-    if user.all_forward(:secret, user, args[0]).member? @secret
+    keys = user.get_all(user, args[0])
+    if not keys.any?
+      "You don't have a " + args[0].to_s
+    elsif keys[0].secret(user) == @secret
       @locked = false
       "You unlock the " + names(user)[0].to_s
     else
@@ -83,7 +73,10 @@ class LockedDoor < Door
 
   def lock! user, *args
     return "You lock a door with a key" if args.length != 1
-    if user.all_forward(:secret, user, args[0]).member? @secret
+    keys = user.get_all(user, args[0])
+    if not keys.any?
+      "You don't have a " + args[0]
+    elsif keys[0].secret(user) == @secret
       @locked = true
       "You lock the " + names(user)[0].to_s
     else
@@ -97,8 +90,8 @@ class LockedDoor < Door
 end
 
 class Key < Thing
-  def initialize names, description, secret
-    super names, description
+  def initialize names, description, parent, secret
+    super names, description, parent
     @secret = secret
   end
   reply_var :secret

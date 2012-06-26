@@ -4,8 +4,8 @@ end
 class Container < Thing
   attr_accessor :things
   
-  def initialize names, description, things=[]
-    super names, description
+  def initialize names, description, parent, things=[]
+    super names, description, parent
     @things = things
   end
   
@@ -61,7 +61,7 @@ class Container < Thing
     all = get_all(user, name)
     p all
     if all.length == 1
-      all[0].send message, user, *args[1..-1]
+      all[0].send message, user, *args
     elsif all.length == 0
       nil
     else
@@ -133,8 +133,8 @@ class Window < Thing
     [description!(user), room(user).look!(user)]
   end
 
-  def initialize names, description, room
-    super names, description
+  def initialize names, description, parent, room
+    super names, description, parent
     @room = room
   end
 end

@@ -7,11 +7,9 @@ class Queue
 end
 
 class User < BasicLook
-  attr_accessor :room, :queue
-  def initialize names, desc, room
-    super names, desc
-    @room = room
-    @room.things << self
+  attr_accessor :queue
+  def initialize names, desc, parent
+    super names, desc, parent
     @queue = Queue.new
   end
 
@@ -20,9 +18,9 @@ class User < BasicLook
     @queue = Queue.new
   end
 
-  def say! user, *message
+  def whisper! user, *message
     @queue << user.names(self)[0].to_s + " : " + message.map {|e| e.to_s }.join(" ") if user != self
-    nil
+    ""
   end
 
   def names user
@@ -38,12 +36,12 @@ class User < BasicLook
   end
 
   def look! user,*args
-    if user == self or user.room == self
+    if user == self or user.parent == self
       contents = super(user,*args)
       if args.any?
         contents
       else
-        [user.room == self ? "It's quite dark in here" : "In your pockets you have", contents[1].flatten.compact.any? ? contents[1] : ["Nothing"]]
+        [user.parent == self ? "It's quite dark in here" : "In your pockets you have", contents[1].flatten.compact.any? ? contents[1] : ["Nothing"]]
       end
     elsif args == []
       description!(user)
@@ -52,20 +50,7 @@ class User < BasicLook
     end
   end
 
-  #def takeable
-  #  super
-  #  wrap(:take!, %q{ |user,args,cb|
-  #    @room = user
-  #    cb.call #user#, *args
-  #  })
-  #  wrap(:put!, %q{ |user,args,cb|
-  #    @room = user
-  #    cb.call #user#, *args
-  #  })
-  #end
-
-
   def inspect
-    "<#{self.class} #{@names[0].to_s} in #{@room.instance_variable_get(:@names)[0].to_s} : #{@things.map {|e| e.instance_variable_get(:@names)[0].to_s } }>"
+    "<#{self.class} #{@names[0].to_s} in #{@parent.instance_variable_get(:@names)[0].to_s} : #{@things.map {|e| e.instance_variable_get(:@names)[0].to_s } }>"
   end
 end
